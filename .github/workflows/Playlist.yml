@@ -1,80 +1,58 @@
-name: Update TV Playlist
+name: Download and Save Playlist
 
 on:
+  # 手动触发
+  workflow_dispatch:
+  # 自动定时触发（可选，示例为每天凌晨2点运行）
   schedule:
-    # 每天凌晨1点自动运行（UTC时间）
-    - cron: '0 1 * * *'
-  workflow_dispatch:  # 允许手动触发
-    inputs:
-      reason:
-        description: '手动触发原因'
-        required: false
-        default: '手动更新'
+    - cron: '0 2 * * *'
 
 jobs:
-  update-playlist:
+  download-file:
     runs-on: ubuntu-latest
     
-    permissions:
-      contents: write  # 确保有写入仓库的权限
-    
     steps:
-      - name: 检出代码
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # 获取完整历史记录
-          persist-credentials: true  # 保持认证信息
-
-      - name: 下载播放列表
+        
+      - name: Download playlist file
         run: |
-          # 创建目录（如果不存在）
-          mkdir -p data
-          
-          # 下载txt文件内容
-          echo "正在下载播放列表..."
-          curl -s -L "${{ secrets.PLAYLIST_URL || 'http://43.251.226.89:8080/live.txt' }}" -o data/tv.txt
+          # 下载文件并保存为 tv.txt
+          curl -s -o tv.txt "http://43.251.226.89:8080/live.txt"
           
           # 检查文件是否下载成功
-          if [ -s "data/tv.txt" ]; then
-            echo "✓ 文件下载成功"
-            echo "文件大小: $(wc -l < data/tv.txt) 行"
+          if [ -f "tv.txt" ]; then
+            echo "文件下载成功"
+            # 显示文件基本信息
+            echo "文件大小: $(wc -l < tv.txt) 行"
+            echo "前5行内容预览:"
+            head -5 tv.txt
           else
-            echo "✗ 文件下载失败或为空"
+            echo "文件下载失败"
             exit 1
           fi
-          
-          # 设置文件读写权限（默认通常已有）
-          chmod 644 data/tv.txt
-          
-          # 显示文件前5行内容作为验证
-          echo "文件前5行内容:"
-          head -5 data/tv.txt
-          
-          # 统计不同类型的链接数量（如果有的话）
-          echo "文件统计:"
-          echo "总行数: $(wc -l < data/tv.txt)"
-          echo "包含http的行数: $(grep -c "http" data/tv.txt || true)"
-
-      - name: 提交更新
+        
+      - name: Set file permissions
         run: |
-          # 配置Git用户
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          # 设置读写权限（644：所有者读写，其他用户只读）
+          chmod 644 tv.txt
           
-          # 检查是否有更改
-          if git diff --quiet data/tv.txt; then
-            echo "文件无变化，无需提交"
+          # 验证权限
+          echo "文件权限:"
+          ls -la tv.txt
+        
+      - name: Commit and push changes
+        run: |
+          # 配置git用户
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          # 检查文件是否有变化
+          if git diff --quiet; then
+            echo "文件没有变化，无需提交"
           else
-            echo "检测到文件变化，正在提交..."
-            git add data/tv.txt
-            git commit -m "🔄 更新播放列表 $(date +'%Y-%m-%d %H:%M:%S')"
+            # 提交更改
+            git add tv.txt
+            git commit -m "更新播放列表文件 tv.txt [$(date +'%Y-%m-%d %H:%M:%S')]"
             git push
-            echo "✓ 已提交更新"
           fi
-
-      - name: 验证文件权限
-        run: |
-          echo "文件权限信息:"
-          ls -la data/tv.txt
-          echo -e "\n文件所有权:"
-          stat -c "用户:%U 组:%G 权限:%A" data/tv.txt

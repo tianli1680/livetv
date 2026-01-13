@@ -1,0 +1,95 @@
+name: Download and Save Playlist
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+permissions:
+  contents: write  # 添加写入权限
+
+jobs:
+  download-file:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository with token
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0  # 获取所有历史记录
+          
+      - name: Download playlist file
+        run: |
+          echo "正在下载播放列表..."
+          
+          # 使用curl下载文件
+          curl -s -o tv.txt "http://43.251.226.89:8080/live.txt" || {
+            echo "下载失败"
+            exit 1
+          }
+          
+          # 检查文件
+          if [ -f "tv.txt" ] && [ -s "tv.txt" ]; then
+            echo "✅ 文件下载成功"
+            echo "文件大小: $(wc -l < tv.txt) 行"
+            echo "文件内容预览:"
+            head -3 tv.txt
+          else
+            echo "❌ 文件下载失败或为空"
+            exit 1
+          fi
+        
+      - name: Set file permissions
+        run: |
+          chmod 644 tv.txt
+          echo "文件权限已设置"
+        
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        
+      - name: Check for changes
+        id: git-check
+        run: |
+          echo "检查文件变化..."
+          git status
+          
+          # 检查是否有未提交的更改
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "没有变化需要提交"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "发现变化，需要提交"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+        
+      - name: Commit and push changes
+        if: steps.git-check.outputs.has_changes == 'true'
+        run: |
+          echo "提交更改到GitHub仓库..."
+          
+          # 添加文件
+          git add tv.txt
+          
+          # 提交
+          git commit -m "更新播放列表文件 [$(date +'%Y-%m-%d %H:%M:%S')]
+          
+          - 自动更新播放列表
+          - 文件大小: $(wc -l < tv.txt) 行"
+          
+          # 推送（使用--force确保推送成功）
+          git push origin HEAD:${{ github.ref }} || git push --force origin HEAD:${{ github.ref }}
+          
+          echo "✅ 文件已成功提交到仓库"
+        
+      - name: Verify commit
+        run: |
+          echo "验证结果..."
+          echo "当前分支: $(git branch --show-current)"
+          echo "最新提交:"
+          git log --oneline -1
+          echo ""
+          echo "文件状态:"
+          ls -la tv.txt

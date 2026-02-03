@@ -3,8 +3,7 @@
 background:radial-gradient(circle,#020617,#000);font-family:Consolas;color:#00ffff">
 <div style="padding:40px;border-radius:18px;background:rgba(0,0,0,.75);
 box-shadow:0 0 50px rgba(0,255,255,.45);text-align:center">
-<h2>仅直播壳子使用</h2>
 <p>浏览器禁止访问</p>
-<p>📊 今日：36</p>
+<p>📊 今日：14</p>
 <p>📊 昨日：0</p>
 </div></body></html>
